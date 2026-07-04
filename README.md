@@ -14,10 +14,7 @@ An interactive map editor for placing markers and drawing polygons, with GeoJSON
 
 ---
 
-
-
 ## Tech Stack
-
 
 | Concern         | Choice                  |
 | --------------- | ----------------------- |
@@ -31,10 +28,7 @@ An interactive map editor for placing markers and drawing polygons, with GeoJSON
 | Notifications   | `sonner`                |
 | Tooling         | ESLint, Prettier, Husky |
 
-
 ---
-
-
 
 ## Prerequisites
 
@@ -44,29 +38,28 @@ An interactive map editor for placing markers and drawing polygons, with GeoJSON
 
 ---
 
-
-
 ## Getting Started
 
 1. **Install dependencies**
-  ```bash
-   npm install
-  ```
+
+```bash
+ npm install
+```
+
 2. **Configure environment variables**
-  Create a `.env.local` file in the project root:
+   Create a `.env.local` file in the project root:
    The app reads this at build time. If the token is missing, the map area renders a clear inline message instead of failing silently.
 3. **Start the dev server**
-  ```bash
-   npm run dev
-  ```
-   The app runs on [http://localhost:3000](http://localhost:3000) (strict port).
+
+```bash
+ npm run dev
+```
+
+The app runs on [http://localhost:3000](http://localhost:3000) (strict port).
 
 ---
 
-
-
 ## Available Scripts
-
 
 | Script                 | Description                                     |
 | ---------------------- | ----------------------------------------------- |
@@ -79,12 +72,9 @@ An interactive map editor for placing markers and drawing polygons, with GeoJSON
 | `npm run format`       | Format the codebase with Prettier.              |
 | `npm run format:check` | Check formatting without writing changes.       |
 
-
 A Husky `pre-push` hook runs formatting, lint, and type-check to keep `main` green.
 
 ---
-
-
 
 ## Usage
 
@@ -92,14 +82,14 @@ A Husky `pre-push` hook runs formatting, lint, and type-check to keep `main` gre
 2. **Click the map** to add markers or polygon vertices.
 3. Open the **Geometry panel** (sidebar on desktop, bottom sheet on mobile) to review markers and the computed polygon area.
 4. Use the **header actions**:
-  - **Save / Load** — persist to or restore from `localStorage`.
-  - **Export** — download the current state as `geomap.geojson`.
-  - **Import** — load markers and a polygon from a GeoJSON file (max 5 MB).
+
+- **Save / Load** — persist to or restore from `localStorage`.
+- **Export** — download the current state as `geomap.geojson`.
+- **Import** — load markers and a polygon from a GeoJSON file (max 5 MB).
+
 5. **Clear** wipes all geometry (with a confirmation prompt).
 
 ---
-
-
 
 ## Project Structure
 
@@ -132,8 +122,6 @@ src/
 
 ---
 
-
-
 ## Architecture
 
 State lives entirely in `[App.tsx](src/App.tsx)`. Mapbox is managed imperatively inside `[Map.tsx](src/component/Map.tsx)` via refs and effects, and is lazy-loaded so the heavy `mapbox-gl` bundle stays out of the initial page load.
@@ -152,10 +140,6 @@ flowchart TB
   Map --> polygonUtils["utils/polygon.ts"]
 ```
 
-
-
-
-
 ### Design notes
 
 - **Incremental rendering** — markers are reconciled by `id` (add/update/remove only what changed) rather than being torn down on every state update. The polygon source and layers are created once and refreshed via `setData`.
@@ -165,8 +149,6 @@ flowchart TB
 
 ---
 
-
-
 ## GeoJSON Format
 
 Exports produce a standard `FeatureCollection`:
@@ -175,4 +157,3 @@ Exports produce a standard `FeatureCollection`:
 - **Polygon** → a single `Polygon` feature (the ring is auto-closed).
 
 On import, `Point` features become markers and the first ring of the first `Polygon` becomes the polygon points. Only a single polygon is supported.
-

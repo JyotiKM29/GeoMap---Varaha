@@ -1,14 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import {
-  Download,
-  FolderOpen,
-  Map,
-  Menu,
-  Save,
-  Upload,
-  X,
-} from 'lucide-react';
+import { Download, FolderOpen, Map, Menu, Save, Upload, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface HeaderProps {
@@ -34,7 +26,12 @@ const BUTTON_STYLES: Record<Variant, string> = {
     'flex items-center gap-3 rounded-lg px-4 py-3 text-slate-200 transition hover:bg-slate-800',
 };
 
-function ActionButton({ label, icon: Icon, onClick, variant }: ActionButtonProps) {
+function ActionButton({
+  label,
+  icon: Icon,
+  onClick,
+  variant,
+}: ActionButtonProps) {
   const iconSize = variant === 'desktop' ? 'h-4 w-4' : 'h-5 w-5';
 
   return (
