@@ -1,13 +1,12 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 import type { MarkerType, Point } from '@/types/map';
-import { renderMarkers } from '@/utils/marker';
-import { drawPolygon, removePolygon } from '@/utils/polygon';
+import { syncMarkers } from '@/utils/marker';
+import type { MarkerRegistry } from '@/utils/marker';
+import { initPolygonLayers, updatePolygon } from '@/utils/polygon';
 import {
   MAPBOX_TOKEN,
   DEFAULT_CENTER,
@@ -23,20 +22,18 @@ interface MapProps {
   setPolygonPoints: Dispatch<SetStateAction<Point[]>>;
 
   mode: 'marker' | 'polygon';
-  setPolygonArea: Dispatch<SetStateAction<number>>;
 }
 
-export default function Map({
+export default function MapView({
   markers,
   setMarkers,
   polygonPoints,
   setPolygonPoints,
   mode,
-  setPolygonArea,
 }: MapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const markerRefs = useRef<mapboxgl.Marker[]>([]);
+  const markerRegistryRef = useRef<MarkerRegistry>(new Map());
   const modeRef = useRef(mode);
 
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -49,6 +46,7 @@ export default function Map({
   // Create map once
   useEffect(() => {
     if (!mapContainerRef.current) return;
+    if (!MAPBOX_TOKEN) return;
 
     const map = new mapboxgl.Map({
       accessToken: MAPBOX_TOKEN,
@@ -60,6 +58,7 @@ export default function Map({
 
     map.on('load', () => {
       mapRef.current = map;
+      initPolygonLayers(map);
       setMapLoaded(true);
     });
 
@@ -84,8 +83,10 @@ export default function Map({
       }
     });
 
+    const registry = markerRegistryRef.current;
+
     return () => {
-      markerRefs.current = [];
+      registry.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -93,27 +94,39 @@ export default function Map({
 
   // Sync markers
   useEffect(() => {
-    if (!mapLoaded) return;
-    if (!mapRef.current) return;
+    if (!mapLoaded || !mapRef.current) return;
 
-    renderMarkers(mapRef.current, markers, markerRefs);
+    syncMarkers(mapRef.current, markers, markerRegistryRef.current);
   }, [markers, mapLoaded]);
 
   // Sync polygon
   useEffect(() => {
-    if (!mapLoaded) return;
-    if (!mapRef.current) return;
+    if (!mapLoaded || !mapRef.current) return;
 
-    if (polygonPoints.length === 0) {
-      removePolygon(mapRef.current);
-      setPolygonArea(0);
-      return;
-    }
-
-    const area = drawPolygon(mapRef.current, polygonPoints);
-
-    setPolygonArea(area);
+    updatePolygon(mapRef.current, polygonPoints);
   }, [polygonPoints, mapLoaded]);
 
-  return <div ref={mapContainerRef} className="w-full h-full" />;
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-slate-950 p-6 text-center">
+        <p className="max-w-sm text-sm text-slate-300">
+          Mapbox access token is missing. Set{' '}
+          <code className="text-blue-400">VITE_MAPBOX_TOKEN</code> in your
+          environment to load the map.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapContainerRef} className="h-full w-full" />
+
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60">
+          <span className="text-sm text-slate-300">Loading map...</span>
+        </div>
+      )}
+    </div>
+  );
 }

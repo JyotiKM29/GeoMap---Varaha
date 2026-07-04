@@ -1,8 +1,12 @@
 import { useCallback } from 'react';
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
+import { toast } from 'sonner';
+import type { FeatureCollection, Position } from 'geojson';
 
 import { buildGeoJSON } from '@/utils/geojson';
 import type { MarkerType, Point } from '@/types/map';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 interface Props {
   markers: MarkerType[];
@@ -11,55 +15,37 @@ interface Props {
   setPolygonPoints: Dispatch<SetStateAction<Point[]>>;
 }
 
-interface PointFeature {
-  geometry: {
-    type: 'Point';
-    coordinates: [number, number];
-  };
+function isFeatureCollection(value: unknown): value is FeatureCollection {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as FeatureCollection).type === 'FeatureCollection' &&
+    Array.isArray((value as FeatureCollection).features)
+  );
 }
 
-interface PolygonFeature {
-  geometry: {
-    type: 'Polygon';
-    coordinates: [number, number][][];
-  };
+function toPoint([lng, lat]: Position): Point {
+  return { lng, lat };
 }
 
-type GeoJSONFeature = PointFeature | PolygonFeature;
-
-interface GeoJSON {
-  type: 'FeatureCollection';
-  features: GeoJSONFeature[];
-}
-
-function parseGeoJSON(geojson: GeoJSON) {
+function parseGeoJSON(geojson: FeatureCollection) {
   const markers: MarkerType[] = [];
   const polygonPoints: Point[] = [];
 
   geojson.features.forEach((feature) => {
-    switch (feature.geometry.type) {
-      case 'Point': {
-        const [lng, lat] = feature.geometry.coordinates;
+    const geometry = feature.geometry;
 
-        markers.push({
-          id: crypto.randomUUID(),
-          lng,
-          lat,
-        });
+    if (geometry.type === 'Point') {
+      const { lng, lat } = toPoint(geometry.coordinates);
+      markers.push({ id: crypto.randomUUID(), lng, lat });
+      return;
+    }
 
-        break;
-      }
-
-      case 'Polygon': {
-        feature.geometry.coordinates[0].slice(0, -1).forEach(([lng, lat]) => {
-          polygonPoints.push({
-            lng,
-            lat,
-          });
-        });
-
-        break;
-      }
+    if (geometry.type === 'Polygon' && geometry.coordinates.length > 0) {
+      // Drop the closing coordinate that mirrors the first vertex.
+      geometry.coordinates[0].slice(0, -1).forEach((position) => {
+        polygonPoints.push(toPoint(position));
+      });
     }
   });
 
@@ -95,26 +81,30 @@ export function useGeoJSON({
 
       if (!file) return;
 
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('File is too large (max 5 MB).');
+        e.target.value = '';
+        return;
+      }
+
       const reader = new FileReader();
 
       reader.onload = () => {
         try {
-          const geojson = JSON.parse(reader.result as string) as GeoJSON;
+          const parsed: unknown = JSON.parse(reader.result as string);
 
-          if (
-            geojson.type !== 'FeatureCollection' ||
-            !Array.isArray(geojson.features)
-          ) {
+          if (!isFeatureCollection(parsed)) {
             throw new Error('Invalid GeoJSON');
           }
 
-          const { markers, polygonPoints } = parseGeoJSON(geojson);
+          const { markers, polygonPoints } = parseGeoJSON(parsed);
 
           setMarkers(markers);
           setPolygonPoints(polygonPoints);
+          toast.success('GeoJSON imported successfully.');
         } catch (error) {
           console.error(error);
-          alert('Invalid GeoJSON file.');
+          toast.error('Invalid GeoJSON file.');
         } finally {
           e.target.value = '';
         }

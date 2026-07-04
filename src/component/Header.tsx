@@ -1,15 +1,71 @@
-'use client';
-
-import { Download, FolderOpen, Save, Upload, Map, Menu, X } from 'lucide-react';
-
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import {
+  Download,
+  FolderOpen,
+  Map,
+  Menu,
+  Save,
+  Upload,
+  X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface HeaderProps {
   onSave: () => void;
   onLoad: () => void;
   onExport: () => void;
   onImport: (e: ChangeEvent<HTMLInputElement>) => void;
+}
+
+type Variant = 'desktop' | 'mobile';
+
+interface ActionButtonProps {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  variant: Variant;
+}
+
+const BUTTON_STYLES: Record<Variant, string> = {
+  desktop:
+    'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white',
+  mobile:
+    'flex items-center gap-3 rounded-lg px-4 py-3 text-slate-200 transition hover:bg-slate-800',
+};
+
+function ActionButton({ label, icon: Icon, onClick, variant }: ActionButtonProps) {
+  const iconSize = variant === 'desktop' ? 'h-4 w-4' : 'h-5 w-5';
+
+  return (
+    <button onClick={onClick} className={BUTTON_STYLES[variant]}>
+      <Icon className={iconSize} />
+      {label}
+    </button>
+  );
+}
+
+function ImportButton({
+  onImport,
+  variant,
+}: {
+  onImport: (e: ChangeEvent<HTMLInputElement>) => void;
+  variant: Variant;
+}) {
+  const iconSize = variant === 'desktop' ? 'h-4 w-4' : 'h-5 w-5';
+
+  return (
+    <label className={`cursor-pointer ${BUTTON_STYLES[variant]}`}>
+      <Upload className={iconSize} />
+      Import
+      <input
+        type="file"
+        accept=".geojson,.json"
+        onChange={onImport}
+        className="hidden"
+      />
+    </label>
+  );
 }
 
 export default function Header({
@@ -19,6 +75,29 @@ export default function Header({
   onImport,
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
+
+  const actions = [
+    { id: 'save', label: 'Save', icon: Save, onClick: onSave },
+    { id: 'load', label: 'Load', icon: FolderOpen, onClick: onLoad },
+    { id: 'export', label: 'Export', icon: Download, onClick: onExport },
+  ] as const;
+
+  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
+    onImport(e);
+    setMobileMenuOpen(false);
+  };
 
   return (
     <>
@@ -31,67 +110,25 @@ export default function Header({
             </h1>
           </div>
 
-          <div className="hidden md:flex items-center gap-4">
-            <button
-              onClick={onSave}
-              className="
-                    flex items-center gap-2
-                    rounded-lg
-                    border border-slate-700
-                    bg-slate-900
-                    px-4 py-2
-                    text-sm font-medium
-                    text-slate-200
-                    transition-all
-                    hover:bg-slate-800
-                  "
-            >
-              <Save className="h-4 w-4" />
-              Save
-            </button>
-
-            <button
-              onClick={onLoad}
-              className="
-    flex items-center gap-2
-    rounded-lg
-    border border-slate-700
-    bg-slate-900
-    px-4 py-2
-    text-sm font-medium
-    text-slate-200
-    transition-all
-    hover:bg-slate-800
-  "
-            >
-              <FolderOpen className="h-4 w-4" />
-              Load
-            </button>
-            <button
-              onClick={onExport}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </button>
-
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white">
-              <Upload className="h-4 w-4" />
-              Import
-              <input
-                type="file"
-                accept=".geojson,.json"
-                onChange={onImport}
-                className="hidden"
+          <div className="hidden items-center gap-2 md:flex">
+            {actions.map((action) => (
+              <ActionButton
+                key={action.id}
+                label={action.label}
+                icon={action.icon}
+                onClick={action.onClick}
+                variant="desktop"
               />
-            </label>
+            ))}
+            <ImportButton onImport={onImport} variant="desktop" />
           </div>
-
-          {/* Mobile Menu */}
 
           <div className="md:hidden">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
+              aria-label="Toggle menu"
               className="rounded-lg p-2 text-slate-300 hover:bg-slate-800"
             >
               {mobileMenuOpen ? (
@@ -105,62 +142,24 @@ export default function Header({
       </header>
 
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-700 bg-slate-950">
+        <div
+          id="mobile-menu"
+          className="border-b border-slate-700 bg-slate-950 md:hidden"
+        >
           <div className="flex flex-col gap-2 p-4">
-            {/* Save */}
-
-            <button
-              onClick={() => {
-                onSave();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-200 hover:bg-slate-800"
-            >
-              <Save className="h-5 w-5" />
-              Save
-            </button>
-
-            {/* Load */}
-
-            <button
-              onClick={() => {
-                onLoad();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-200 hover:bg-slate-800"
-            >
-              <FolderOpen className="h-5 w-5" />
-              Load
-            </button>
-
-            {/* Export */}
-
-            <button
-              onClick={() => {
-                onExport();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-200 hover:bg-slate-800"
-            >
-              <Download className="h-5 w-5" />
-              Export
-            </button>
-
-            {/* Import */}
-
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-slate-200 hover:bg-slate-800">
-              <Upload className="h-5 w-5" />
-              Import
-              <input
-                type="file"
-                accept=".geojson,.json"
-                onChange={(e) => {
-                  onImport(e);
+            {actions.map((action) => (
+              <ActionButton
+                key={action.id}
+                label={action.label}
+                icon={action.icon}
+                onClick={() => {
+                  action.onClick();
                   setMobileMenuOpen(false);
                 }}
-                className="hidden"
+                variant="mobile"
               />
-            </label>
+            ))}
+            <ImportButton onImport={handleImport} variant="mobile" />
           </div>
         </div>
       )}

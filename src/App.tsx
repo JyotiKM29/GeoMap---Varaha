@@ -1,41 +1,34 @@
-import { useState, useCallback } from 'react'; // 👈 useEffect removed!
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { Toaster, toast } from 'sonner';
 
 import Header from '@/component/Header';
 import Toolbar from '@/component/Toolbar';
 import Sidebar from '@/component/Sidebar';
 import MobileGeometry from '@/component/MobileGeometry';
-import GeoMap from '@/component/Map';
 import { useGeoJSON } from '@/hooks/useGeoJSON';
+import { loadStoredState, useMapPersistence } from '@/hooks/useMapPersistence';
+import { computeArea } from '@/utils/polygon';
 import type { MarkerType, Point } from '@/types/map';
 
-const STORAGE_KEY = 'geomap-data';
+const GeoMap = lazy(() => import('@/component/Map'));
 
-const getInitialState = (key: 'markers' | 'polygonPoints') => {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const data = JSON.parse(saved);
-      return data[key] ?? [];
-    }
-  } catch {
-    console.error('Failed to parse map data from local storage');
-  }
-
-  return [];
-};
+const initialState = loadStoredState();
 
 export default function App() {
-  const [markers, setMarkers] = useState<MarkerType[]>(() =>
-    getInitialState('markers'),
+  const [markers, setMarkers] = useState<MarkerType[]>(
+    () => initialState?.markers ?? [],
   );
-  const [polygonPoints, setPolygonPoints] = useState<Point[]>(() =>
-    getInitialState('polygonPoints'),
+  const [polygonPoints, setPolygonPoints] = useState<Point[]>(
+    () => initialState?.polygonPoints ?? [],
+  );
+  const [mode, setMode] = useState<'marker' | 'polygon'>('marker');
+
+  const polygonArea = useMemo(
+    () => computeArea(polygonPoints),
+    [polygonPoints],
   );
 
-  const [polygonArea, setPolygonArea] = useState(0);
-  const [mode, setMode] = useState<'marker' | 'polygon'>('marker');
+  const { save, load, clear } = useMapPersistence({ markers, polygonPoints });
 
   const { exportGeoJSON, importGeoJSON } = useGeoJSON({
     markers,
@@ -44,41 +37,31 @@ export default function App() {
     setPolygonPoints,
   });
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
+    if (!window.confirm('Clear all markers and the polygon?')) return;
+
     setMarkers([]);
     setPolygonPoints([]);
-    setPolygonArea(0);
-    localStorage.removeItem(STORAGE_KEY);
-  };
+    clear();
+  }, [clear]);
 
-  const handleSave = () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        markers,
-        polygonPoints,
-      }),
-    );
-    alert('Map saved successfully.');
-  };
+  const handleSave = useCallback(() => {
+    save();
+    toast.success('Map saved successfully.');
+  }, [save]);
 
   const handleLoad = useCallback(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = load();
 
     if (!saved) {
-      alert('No saved map found.');
+      toast.error('No saved map found.');
       return;
     }
 
-    try {
-      const data = JSON.parse(saved);
-      setMarkers(data.markers ?? []);
-      setPolygonPoints(data.polygonPoints ?? []);
-      alert('Map loaded successfully.');
-    } catch {
-      alert('Unable to load saved map.');
-    }
-  }, []);
+    setMarkers(saved.markers);
+    setPolygonPoints(saved.polygonPoints);
+    toast.success('Map loaded successfully.');
+  }, [load]);
 
   return (
     <main className="flex h-screen flex-col">
@@ -105,16 +88,25 @@ export default function App() {
         />
 
         <div className="flex-1">
-          <GeoMap
-            markers={markers}
-            setMarkers={setMarkers}
-            polygonPoints={polygonPoints}
-            setPolygonPoints={setPolygonPoints}
-            mode={mode}
-            setPolygonArea={setPolygonArea}
-          />
+          <Suspense
+            fallback={
+              <div className="flex h-full w-full items-center justify-center bg-slate-950">
+                <span className="text-sm text-slate-300">Loading map...</span>
+              </div>
+            }
+          >
+            <GeoMap
+              markers={markers}
+              setMarkers={setMarkers}
+              polygonPoints={polygonPoints}
+              setPolygonPoints={setPolygonPoints}
+              mode={mode}
+            />
+          </Suspense>
         </div>
       </div>
+
+      <Toaster position="top-right" theme="dark" richColors />
     </main>
   );
 }
