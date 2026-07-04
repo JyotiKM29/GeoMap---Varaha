@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react'; // 👈 useEffect removed!
 
 import Header from '@/component/Header';
 import Toolbar from '@/component/Toolbar';
@@ -10,9 +10,30 @@ import type { MarkerType, Point } from '@/types/map';
 
 const STORAGE_KEY = 'geomap-data';
 
+const getInitialState = (key: 'markers' | 'polygonPoints') => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      return data[key] ?? [];
+    }
+  } catch {
+    console.error('Failed to parse map data from local storage');
+  }
+
+  return [];
+};
+
 export default function App() {
-  const [markers, setMarkers] = useState<MarkerType[]>([]);
-  const [polygonPoints, setPolygonPoints] = useState<Point[]>([]);
+  const [markers, setMarkers] = useState<MarkerType[]>(() =>
+    getInitialState('markers'),
+  );
+  const [polygonPoints, setPolygonPoints] = useState<Point[]>(() =>
+    getInitialState('polygonPoints'),
+  );
+
   const [polygonArea, setPolygonArea] = useState(0);
   const [mode, setMode] = useState<'marker' | 'polygon'>('marker');
 
@@ -27,7 +48,7 @@ export default function App() {
     setMarkers([]);
     setPolygonPoints([]);
     setPolygonArea(0);
-    localStorage.removeItem('geomap-data'); // storage key
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const handleSave = () => {
@@ -38,35 +59,25 @@ export default function App() {
         polygonPoints,
       }),
     );
-
     alert('Map saved successfully.');
   };
 
-  const handleLoad = ({ fromMount = false } = {}) => {
+  const handleLoad = useCallback(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
 
     if (!saved) {
-      if (fromMount) return;
-
       alert('No saved map found.');
       return;
     }
 
     try {
       const data = JSON.parse(saved);
-
       setMarkers(data.markers ?? []);
       setPolygonPoints(data.polygonPoints ?? []);
-      console.log({ fromMount });
-      if (fromMount) return;
       alert('Map loaded successfully.');
     } catch {
       alert('Unable to load saved map.');
     }
-  };
-
-  useEffect(() => {
-    handleLoad({ fromMount: true });
   }, []);
 
   return (
