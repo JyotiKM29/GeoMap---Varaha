@@ -1,4 +1,4 @@
-# GeoMap [Preview](https://6a48f7959d7051a92bdb8975--starlit-fudge-89a40b.netlify.app/)
+# GeoMap [Preview](https://geomap2911.netlify.app/)
 
 An interactive map editor for placing markers and drawing polygons, with GeoJSON import/export and local persistence. Built with React 19, TypeScript, Vite, Tailwind CSS, and Mapbox GL JS.
 
